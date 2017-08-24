@@ -28,7 +28,7 @@ def find_between_r( s, first, last ):
 class ReactosRss:
     @staticmethod
     def get(count = 20):
-        url = 'https://jira.reactos.org/sr/jira.issueviews:searchrequest-rss/temp/SearchRequest.xml?jqlQuery=statusCategory+%3D+Done+order+by+updated+DESC&tempMax={0}'.format(count)
+        url = 'https://jira.reactos.org/sr/jira.issueviews:searchrequest-rss/temp/SearchRequest.xml?jqlQuery=resolutiondate+%3E%3D+-1w+order+by+updated+DESC&tempMax={0}'.format(count)
         res = requests.get(url)
         text = res.text
         res.close()
