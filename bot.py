@@ -1,10 +1,10 @@
-import telepot, time, json, os, datetime, threading, logging
+import telepot, time, json, os, datetime, threading, logging, sys
 from reactosrss import ReactosRss
 from telepot.loop import MessageLoop
-from telepot.exception import BotWasKickedError
+from telepot.exception import BotWasKickedError, BotWasBlockedError
 
 logging.basicConfig(
-    filename="test.log",
+    filename="jirainformer.log",
     level=logging.INFO,
     format="%(asctime)s:%(levelname)s:%(message)s"
     )
@@ -66,6 +66,7 @@ def handle(msg):
     		bot.sendMessage(chat_id, "Неправильная команда!\nВот правильные:\n/help - открыть помощь.")
 
 bot = telepot.Bot(settings['bot_token'])
+bot.sendMessage(56801774, "говно залупа пенис хер давалка")
 me = bot.getMe()
 print(me)
 
@@ -79,30 +80,34 @@ def reactosrss_posting_thread():
 		except Exception as e:
 			logging.error("Error while receiving RSS from Jira: {0}".format(e))
 			time.sleep(10)
-			continue
-		for el in reversed(els):
-			postdatetime = datetime.datetime.strptime(el['pubDate'], "%a, %d %b %Y %H:%M:%S %z")
-			postunixtime = time.mktime(postdatetime.timetuple())
-			if postunixtime < (history['reactosrss_last_post'] +1):
-				continue
-			else:
-				history['reactosrss_last_post'] = postunixtime
-				save_history()
+		else:
+			for el in reversed(els):
+				postdatetime = datetime.datetime.strptime(el['pubDate'], "%a, %d %b %Y %H:%M:%S %z")
+				postunixtime = time.mktime(postdatetime.timetuple())
+				if postunixtime < (history['reactosrss_last_post'] +1):
+					continue
+				else:
+					history['reactosrss_last_post'] = postunixtime
+					save_history()
+					
+				if el['fixversion'] != '':
+					post = '*{0}*\nwas resolved as *{1}* by [{2}]({3}) and will be merged in *{4}*\n{5}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'], el['fixversion'], el['link'])
+				else:
+					post = '*{0}*\nwas resolved as *{1}* by [{2}]({3})\n{4}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'],  el['link'])
 				
-			if el['status'] == 'Fixed':
-				post = '*{0}*\nwas resolved as *{1}* by [{2}]({3}) and will be merged in *{4}*\n{5}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'], el['fixversion'], el['link'])
-			else:
-				post = '*{0}*\nwas resolved as *{1}* by [{2}]({3})\n{4}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'],  el['link'])
-			
-			for cid in settings['chat_ids'][:]:
-				try:
-					bot.sendMessage(cid, post, parse_mode='Markdown')
-				except BotWasKickedError:
-					settings['chat_ids'].remove(cid)
-					save_setts()
-					logging.info("Bot was kicked from chat with id: {0}".format(cid))
-				except Exception as e:
-					logging.error("Unknown error while sending message: {0}".format(e))
+				for cid in settings['chat_ids'][:]:
+					for _ in range(3):
+						try:
+							bot.sendMessage(cid, post, parse_mode='Markdown')
+						except (BotWasKickedError, BotWasBlockedError) as e:
+							settings['chat_ids'].remove(cid)
+							save_setts()
+							logging.info("Bot was kicked or blocked from chat with id: {0}".format(cid))
+						except Exception as e:
+							logging.error("Unknown error while sending message: {0}; {1}".format(e, sys.exc_info()[0]))
+							continue
+						else:
+							break
 		time.sleep(60)
 
 
