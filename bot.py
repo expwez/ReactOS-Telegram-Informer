@@ -18,16 +18,22 @@ def save_setts():
     with open(configfilename, 'w') as f:
         txt = json.dumps(settings, indent=4, sort_keys=True)
         f.write(txt)
+
+def create_settings():
+	settings = { 'bot_token':'', 'chat_ids':[] }
+	settings['bot_token'] = input("Enter bot token:")
+	save_setts()
         
 def save_history():
 	with open(histfilename, 'w') as f:
 		txt = json.dumps(history, indent=4, sort_keys=True)
 		f.write(txt)
 
-def create_settings():
-	settings = { 'bot_token':'', 'chat_ids':[] }
-	settings['bot_token'] = input("Enter bot token:")
-	save_setts()
+def add_history_entry(el):
+	if len(history) > 10:
+		history['rectosrss_last_posts'].pop()
+	history['rectosrss_last_posts'].insert(0, el)
+	
 
 if os.path.isfile(configfilename): 
 	with open(configfilename) as config:    
@@ -39,7 +45,9 @@ if os.path.isfile(histfilename):
 	with open(histfilename) as histconfig:
 		history = json.load(histconfig)
 else:
-	history = { 'reactosrss_last_post':1503447411.0 }
+	history = { 'reactosrss_last_post':1504345539.0, 
+	'rectosrss_last_posts': [] 
+	}
 	save_history()
 
 
@@ -66,7 +74,6 @@ def handle(msg):
     		bot.sendMessage(chat_id, "Неправильная команда!\nВот правильные:\n/help - открыть помощь.")
 
 bot = telepot.Bot(settings['bot_token'])
-bot.sendMessage(56801774, "говно залупа пенис хер давалка")
 me = bot.getMe()
 print(me)
 
@@ -89,26 +96,30 @@ def reactosrss_posting_thread():
 				else:
 					history['reactosrss_last_post'] = postunixtime
 					save_history()
-					
-				if el['fixversion'] != '':
-					post = '*{0}*\nwas resolved as *{1}* by [{2}]({3}) and will be merged in *{4}*\n{5}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'], el['fixversion'], el['link'])
+				for old_el in history['rectosrss_last_posts']:
+					if (old_el['title'] == el['title']) and (old_el['fixversion'] == el['fixversion']) and (old_el['status'] == el['status']):
+						break
 				else:
-					post = '*{0}*\nwas resolved as *{1}* by [{2}]({3})\n{4}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'],  el['link'])
-				
-				for cid in settings['chat_ids'][:]:
-					for _ in range(3):
-						try:
-							bot.sendMessage(cid, post, parse_mode='Markdown')
-						except (BotWasKickedError, BotWasBlockedError) as e:
-							settings['chat_ids'].remove(cid)
-							save_setts()
-							logging.info("Bot was kicked or blocked from chat with id: {0}".format(cid))
-						except Exception as e:
-							logging.error("Unknown error while sending message: {0}; {1}".format(e, sys.exc_info()[0]))
-							continue
-						else:
-							break
-		time.sleep(60)
+					if el['fixversion'] != '':
+						post = '*{0}*\nwas resolved as *{1}* by [{2}]({3}) and will be merged in *{4}*\n{5}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'], el['fixversion'], el['link'])
+					else:
+						post = '*{0}*\nwas resolved as *{1}* by [{2}]({3})\n{4}'.format(el['title'], el['status'],el['resolver'], el['resolverlink'],  el['link'])
+					
+					for cid in settings['chat_ids'][:]:
+						for _ in range(3):
+							try:
+								bot.sendMessage(cid, post, parse_mode='Markdown')
+							except (BotWasKickedError, BotWasBlockedError) as e:
+								settings['chat_ids'].remove(cid)
+								save_setts()
+								logging.info("Bot was kicked or blocked from chat with id: {0}".format(cid))
+							except Exception as e:
+								logging.error("Unknown error while sending message: {0}; {1}".format(e, sys.exc_info()[0]))
+								continue
+							else:
+								break
+					add_history_entry(el)
+			time.sleep(60)
 
 
 t = threading.Thread(target=reactosrss_posting_thread)
